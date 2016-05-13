@@ -14,7 +14,7 @@
         // Circle vs. Circle
         if ((body1.isCircle)&&(body2.isCircle))
         {
-          return (this.distanceBetween(body1, body2) <= (body1.radius + body1.radius));
+          return (this.distanceBetweenCenters(body1, body2) <= (body1.radius + body2.radius));
         }
         //  Rect vs. Rect
         else if ((!body1.isCircle)&&(!body2.isCircle))
@@ -506,6 +506,100 @@
 
     };
 
+    /**
+    * Find the distance between centers of two display objects (like Sprites).
+    *
+    * @method Phaser.Physics.Arcade#distanceBetweenCenters
+    * @param {any} source - The Display Object to test from.
+    * @param {any} target - The Display Object to test to.
+    * @return {number} The distance between centers of the source and target objects.
+    */
+    Phaser.Physics.Arcade.prototype.distanceBetweenCenters = function (source, target) {
+
+        var dx = source.center.x - target.center.x;
+        var dy = source.center.y - target.center.y;
+
+        return Math.sqrt(dx * dx + dy * dy);
+
+    };
+
+
+    /**
+    * Internal method.
+    *
+    * @method Phaser.Physics.Arcade.Body#checkWorldBounds
+    * @protected
+    */
+    Phaser.Physics.Arcade.Body.prototype.checkWorldBounds = function () {
+
+        var pos = this.position;
+        var bounds = this.game.physics.arcade.bounds;
+        var check = this.game.physics.arcade.checkCollision;
+
+        if (this.isCircle)
+        {
+            var bodyBounds = {};
+            bodyBounds.x = this.center.x - this.radius;
+            bodyBounds.y = this.center.y - this.radius;
+            bodyBounds.right = this.center.x + this.radius;
+            bodyBounds.bottom = this.center.y + this.radius;
+
+            if (bodyBounds.x < bounds.x && check.left)
+            {
+                pos.x = bounds.x - this.halfWidth + this.radius;
+                this.velocity.x *= -this.bounce.x;
+                this.blocked.left = true;
+            }
+            else if (bodyBounds.right > bounds.right && check.right)
+            {
+                pos.x = bounds.right - this.halfWidth - this.radius;
+                this.velocity.x *= -this.bounce.x;
+                this.blocked.right = true;
+            }
+
+            if (bodyBounds.y < bounds.y && check.up)
+            {
+                pos.y = bounds.y - this.halfHeight + this.radius;
+                this.velocity.y *= -this.bounce.y;
+                this.blocked.up = true;
+            }
+            else if (bodyBounds.bottom > bounds.bottom && check.down)
+            {
+                pos.y = bounds.bottom  - this.halfHeight - this.radius;
+                this.velocity.y *= -this.bounce.y;
+                this.blocked.down = true;
+            }
+        }
+        else
+        {
+            if (pos.x < bounds.x && check.left)
+            {
+                pos.x = bounds.x;
+                this.velocity.x *= -this.bounce.x;
+                this.blocked.left = true;
+            }
+            else if (this.right > bounds.right && check.right)
+            {
+                pos.x = bounds.right - this.width;
+                this.velocity.x *= -this.bounce.x;
+                this.blocked.right = true;
+            }
+
+            if (pos.y < bounds.y && check.up)
+            {
+                pos.y = bounds.y;
+                this.velocity.y *= -this.bounce.y;
+                this.blocked.up = true;
+            }
+            else if (this.bottom > bounds.bottom && check.down)
+            {
+                pos.y = bounds.bottom - this.height;
+                this.velocity.y *= -this.bounce.y;
+                this.blocked.down = true;
+            }
+        }
+    };
+
 
     /**
     * Render Sprite Body.
@@ -527,7 +621,7 @@
             context.fillStyle = color;
             if (body.isCircle) {
               context.beginPath();
-              context.arc(body.position.x - body.game.camera.x + body.radius, body.position.y - body.game.camera.y + body.radius, body.radius, 0, 2 * Math.PI, false);
+              context.arc(body.center.x - body.game.camera.x, body.center.y - body.game.camera.y, body.radius, 0, 2 * Math.PI, false);
               context.fill();
             }
             else context.fillRect(body.position.x - body.game.camera.x, body.position.y - body.game.camera.y, body.width, body.height);
