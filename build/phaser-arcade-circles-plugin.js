@@ -269,7 +269,7 @@
         // To calculate the collision circle angle needed between bodies
         if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
         {
-            var angleCollision = this.angleBetween(body1, body2);
+            var angleCollision = this.angleBetweenCenters(body1, body2);
         }
 
         //  Adjust their positions and velocities accordingly (if there was any overlap)
@@ -291,9 +291,9 @@
                 nv2 -= avg;
 
                 body1.velocity.x = (avg + nv1 * body1.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
-                body1.velocity.y = -(avg + nv1 * body1.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
+                body1.velocity.y += -(avg + nv1 * body1.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
                 body2.velocity.x = (avg + nv2 * body2.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
-                body2.velocity.y = (avg + nv2 * body2.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
+                body2.velocity.y += (avg + nv2 * body2.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
             }
             else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
             {
@@ -318,8 +318,8 @@
             if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
             {
                 body1.x += (overlap > 0) ? -(body1.deltaAbsX() + body2.deltaAbsX()) : (body1.deltaAbsX() + body2.deltaAbsX());
-                body1.velocity.x = (v2 - v1 * body1.bounce.x)*Math.sin(angleCollision)*Math.sin(angleCollision);
-                body1.velocity.y = (v2 - v1 * body1.bounce.y)*Math.sin(angleCollision)*Math.cos(angleCollision);
+                body1.velocity.x = (v2 - v1 * body1.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
+                body1.velocity.y += (v2 - v1 * body1.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
             }
             else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
             {
@@ -339,7 +339,7 @@
             {
                 body2.x += (overlap > 0) ? (body1.deltaAbsX() + body2.deltaAbsX()) : -(body1.deltaAbsX() + body2.deltaAbsX());
                 body2.velocity.x = (v1 - v2 * body2.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
-                body2.velocity.y = (v1 - v2 * body2.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
+                body2.velocity.y += (v1 - v2 * body2.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
             }
             else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
             {
@@ -416,7 +416,7 @@
         // To calculate the collision circle angle needed between bodies
         if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
         {
-            var angleCollision = this.angleBetween(body1, body2);
+            var angleCollision = this.angleBetweenCenters(body1, body2);
         }
 
         //  Adjust their positions and velocities accordingly (if there was any overlap)
@@ -437,9 +437,9 @@
                 nv1 -= avg;
                 nv2 -= avg;
 
-                body1.velocity.x = -(avg + nv1 * body1.bounce.x)*Math.sin(angleCollision)*Math.cos(angleCollision);
+                body1.velocity.x += -(avg + nv1 * body1.bounce.x)*Math.sin(angleCollision)*Math.cos(angleCollision);
                 body1.velocity.y = (avg + nv1 * body1.bounce.y)*Math.sin(angleCollision)*Math.sin(angleCollision);
-                body2.velocity.x = (avg + nv2 * body2.bounce.x)*Math.sin(angleCollision)*Math.cos(angleCollision);
+                body2.velocity.x += (avg + nv2 * body2.bounce.x)*Math.sin(angleCollision)*Math.cos(angleCollision);
                 body2.velocity.y = (avg + nv2 * body2.bounce.y)*Math.sin(angleCollision)*Math.sin(angleCollision);
             }
             else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
@@ -465,7 +465,7 @@
             if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
             {
                 body1.y += (overlap > 0) ? -(body1.deltaAbsY() + body2.deltaAbsY()) : (body1.deltaAbsY() + body2.deltaAbsY());
-                body1.velocity.x = (v2 - v1 * body1.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
+                body1.velocity.x += (v2 - v1 * body1.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
                 body1.velocity.y = (v2 - v1 * body1.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
             }
             else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
@@ -485,7 +485,7 @@
             if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
             {
                 body2.y += (overlap > 0) ? (body1.deltaAbsY() + body2.deltaAbsY()) : -(body1.deltaAbsY() + body2.deltaAbsY());
-                body2.velocity.x = (v1 - v2 * body2.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
+                body2.velocity.x += (v1 - v2 * body2.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
                 body2.velocity.y = (v1 - v2 * body2.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
             }
             else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
@@ -523,6 +523,22 @@
 
     };
 
+    /**
+    * Find the angle in radians between centers of two display objects (like Sprites).
+    *
+    * @method Phaser.Physics.Arcade#angleBetweenCenters
+    * @param {any} source - The Display Object to test from.
+    * @param {any} target - The Display Object to test to.
+    * @return {number} The angle in radians between the source and target display objects.
+    */
+    Phaser.Physics.Arcade.prototype.angleBetweenCenters = function (source, target) {
+
+        var dx = target.center.x - source.center.x;
+        var dy = target.center.y - source.center.y;
+
+        return Math.atan2(dy, dx);
+
+    };
 
     /**
     * Internal method.
