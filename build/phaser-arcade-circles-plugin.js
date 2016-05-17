@@ -3,6 +3,217 @@
 	'use strict';
 
     /**
+    * An internal function. Use Phaser.Physics.Arcade.collide instead.
+    *
+    * @method Phaser.Physics.Arcade#collideSpriteVsGroup
+    * @private
+    * @param {Phaser.Sprite} sprite - The sprite to check.
+    * @param {Phaser.Group} group - The Group to check.
+    * @param {function} collideCallback - An optional callback function that is called if the objects collide. The two objects will be passed to this function in the same order in which you specified them.
+    * @param {function} processCallback - A callback function that lets you perform additional checks against the two objects if they overlap. If this is set then collision will only happen if processCallback returns true. The two objects will be passed to this function in the same order in which you specified them.
+    * @param {object} callbackContext - The context in which to run the callbacks.
+    * @param {boolean} overlapOnly - Just run an overlap or a full collision.
+    */
+    Phaser.Physics.Arcade.prototype.collideSpriteVsGroup = function (sprite, group, collideCallback, processCallback, callbackContext, overlapOnly) {
+
+        if (group.length === 0 || !sprite.body)
+        {
+            return;
+        }
+
+        if (this.skipQuadTree || sprite.body.skipQuadTree)
+        {
+            for (var i = 0; i < group.hash.length; i++)
+            {
+                //  Skip duff entries - we can't check a non-existent sprite or one with no body
+                if (!group.hash[i] || !group.hash[i].exists || !group.hash[i].body)
+                {
+                    continue;
+                }
+
+                var body = {};
+                body.x = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.x - group.hash[i].body.radius) : group.hash[i].body.x;
+                body.y = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.y - group.hash[i].body.radius) : group.hash[i].body.y;
+                body.right = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.x + group.hash[i].body.radius) : group.hash[i].body.right;
+                body.bottom = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.y + group.hash[i].body.radius) : group.hash[i].body.bottom;
+
+                //  Skip items either side of the sprite
+                if (this.sortDirection === Phaser.Physics.Arcade.LEFT_RIGHT)
+                {
+                    if (sprite.body.right < body.x)
+                    {
+                        break;
+                    }
+                    else if (body.right < sprite.body.x)
+                    {
+                        continue;
+                    }
+                }
+                else if (this.sortDirection === Phaser.Physics.Arcade.RIGHT_LEFT)
+                {
+                    if (sprite.body.x > body.right)
+                    {
+                        break;
+                    }
+                    else if (body.x > sprite.body.right)
+                    {
+                        continue;
+                    }
+                }
+                else if (this.sortDirection === Phaser.Physics.Arcade.TOP_BOTTOM)
+                {
+                    if (sprite.body.bottom < body.y)
+                    {
+                        break;
+                    }
+                    else if (body.bottom < sprite.body.y)
+                    {
+                        continue;
+                    }
+                }
+                else if (this.sortDirection === Phaser.Physics.Arcade.BOTTOM_TOP)
+                {
+                    if (sprite.body.y > body.bottom)
+                    {
+                        break;
+                    }
+                    else if (body.y > sprite.body.bottom)
+                    {
+                        continue;
+                    }
+                }
+
+                this.collideSpriteVsSprite(sprite, group.hash[i], collideCallback, processCallback, callbackContext, overlapOnly);
+            }
+        }
+        else
+        {
+            //  What is the sprite colliding with in the quadtree?
+            this.quadTree.clear();
+
+            this.quadTree.reset(this.game.world.bounds.x, this.game.world.bounds.y, this.game.world.bounds.width, this.game.world.bounds.height, this.maxObjects, this.maxLevels);
+
+            this.quadTree.populate(group);
+
+            var items = this.quadTree.retrieve(sprite);
+
+            for (var i = 0; i < items.length; i++)
+            {
+                //  We have our potential suspects, are they in this group?
+                if (this.separate(sprite.body, items[i], processCallback, callbackContext, overlapOnly))
+                {
+                    if (collideCallback)
+                    {
+                        collideCallback.call(callbackContext, sprite, items[i].sprite);
+                    }
+
+                    this._total++;
+                }
+            }
+        }
+
+    };
+
+    /**
+    * An internal function. Use Phaser.Physics.Arcade.collide instead.
+    *
+    * @method Phaser.Physics.Arcade#collideGroupVsSelf
+    * @private
+    * @param {Phaser.Group} group - The Group to check.
+    * @param {function} collideCallback - An optional callback function that is called if the objects collide. The two objects will be passed to this function in the same order in which you specified them.
+    * @param {function} processCallback - A callback function that lets you perform additional checks against the two objects if they overlap. If this is set then collision will only happen if processCallback returns true. The two objects will be passed to this function in the same order in which you specified them.
+    * @param {object} callbackContext - The context in which to run the callbacks.
+    * @param {boolean} overlapOnly - Just run an overlap or a full collision.
+    * @return {boolean} True if there was a collision, otherwise false.
+    */
+    Phaser.Physics.Arcade.prototype.collideGroupVsSelf = function (group, collideCallback, processCallback, callbackContext, overlapOnly) {
+
+        if (group.length === 0)
+        {
+            return;
+        }
+
+        for (var i = 0; i < group.hash.length; i++)
+        {
+            //  Skip duff entries - we can't check a non-existent sprite or one with no body
+            if (!group.hash[i] || !group.hash[i].exists || !group.hash[i].body)
+            {
+                continue;
+            }
+
+            var object1 = {};
+            object1.x = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.x - group.hash[i].body.radius) : group.hash[i].body.x;
+            object1.y = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.y - group.hash[i].body.radius) : group.hash[i].body.y;
+            object1.right = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.x + group.hash[i].body.radius) : group.hash[i].body.right;
+            object1.bottom = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.y + group.hash[i].body.radius) : group.hash[i].body.bottom;
+
+            for (var j = i + 1; j < group.hash.length; j++)
+            {
+                //  Skip duff entries - we can't check a non-existent sprite or one with no body
+                if (!group.hash[j] || !group.hash[j].exists || !group.hash[j].body)
+                {
+                    continue;
+                }
+
+                var object2 = {};
+                object2.x = (group.hash[j].body.isCircle) ? (group.hash[j].body.center.x - group.hash[j].body.radius) : group.hash[j].body.x;
+                object2.y = (group.hash[j].body.isCircle) ? (group.hash[j].body.center.y - group.hash[j].body.radius) : group.hash[j].body.y;
+                object2.right = (group.hash[j].body.isCircle) ? (group.hash[j].body.center.x + group.hash[j].body.radius) : group.hash[j].body.right;
+                object2.bottom = (group.hash[j].body.isCircle) ? (group.hash[j].body.center.y + group.hash[j].body.radius) : group.hash[j].body.bottom;
+
+                //  Skip items either side of the sprite
+                if (this.sortDirection === Phaser.Physics.Arcade.LEFT_RIGHT)
+                {
+                    if (object1.right < object2.x)
+                    {
+                        break;
+                    }
+                    else if (object2.right < object1.x)
+                    {
+                        continue;
+                    }
+                }
+                else if (this.sortDirection === Phaser.Physics.Arcade.RIGHT_LEFT)
+                {
+                    if (object1.x > object2.right)
+                    {
+                        continue;
+                    }
+                    else if (object2.x > object1.right)
+                    {
+                        break;
+                    }
+                }
+                else if (this.sortDirection === Phaser.Physics.Arcade.TOP_BOTTOM)
+                {
+                    if (object1.bottom < object2.y)
+                    {
+                        continue;
+                    }
+                    else if (object2.bottom < object1.y)
+                    {
+                        break;
+                    }
+                }
+                else if (this.sortDirection === Phaser.Physics.Arcade.BOTTOM_TOP)
+                {
+                    if (object1.y > object2.bottom)
+                    {
+                        continue;
+                    }
+                    else if (object2.y > object1.bottom)
+                    {
+                        break;
+                    }
+                }
+
+                this.collideSpriteVsSprite(object1, object2, collideCallback, processCallback, callbackContext, overlapOnly);
+            }
+        }
+
+    };
+
+    /**
     * Check for intersection against two bodies.
     *
     * @method Phaser.Physics.Arcade#intersects
