@@ -146,6 +146,7 @@
             object1.y = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.y - group.hash[i].body.radius) : group.hash[i].body.y;
             object1.right = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.x + group.hash[i].body.radius) : group.hash[i].body.right;
             object1.bottom = (group.hash[i].body.isCircle) ? (group.hash[i].body.center.y + group.hash[i].body.radius) : group.hash[i].body.bottom;
+            object1.ref = group.hash[i];
 
             for (var j = i + 1; j < group.hash.length; j++)
             {
@@ -160,6 +161,7 @@
                 object2.y = (group.hash[j].body.isCircle) ? (group.hash[j].body.center.y - group.hash[j].body.radius) : group.hash[j].body.y;
                 object2.right = (group.hash[j].body.isCircle) ? (group.hash[j].body.center.x + group.hash[j].body.radius) : group.hash[j].body.right;
                 object2.bottom = (group.hash[j].body.isCircle) ? (group.hash[j].body.center.y + group.hash[j].body.radius) : group.hash[j].body.bottom;
+                object2.ref = group.hash[j];
 
                 //  Skip items either side of the sprite
                 if (this.sortDirection === Phaser.Physics.Arcade.LEFT_RIGHT)
@@ -207,7 +209,7 @@
                     }
                 }
 
-                this.collideSpriteVsSprite(object1, object2, collideCallback, processCallback, callbackContext, overlapOnly);
+                this.collideSpriteVsSprite(object1.ref, object2.ref, collideCallback, processCallback, callbackContext, overlapOnly);
             }
         }
 
@@ -491,7 +493,7 @@
         {
             if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
             {
-                body1.x -= (overlap > 0) ? -(body1.deltaAbsX() + body2.deltaAbsX()) : (body1.deltaAbsX() + body2.deltaAbsX());
+                body1.x += (overlap > 0) ? (body1.deltaAbsX() + body2.deltaAbsX()) : -(body1.deltaAbsX() + body2.deltaAbsX());
                 body2.x += (overlap > 0) ? (body1.deltaAbsX() + body2.deltaAbsX()) : -(body1.deltaAbsX() + body2.deltaAbsX());
 
                 var nv1 = Math.sqrt((v2 * v2 * body2.mass) / body1.mass) * ((v2 > 0) ? 1 : -1);
@@ -638,7 +640,7 @@
         {
             if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
             {
-                body1.y -= (overlap > 0) ? -(body1.deltaAbsY() + body2.deltaAbsY()) : (body1.deltaAbsY() + body2.deltaAbsY());
+                body1.y += (overlap > 0) ? (body1.deltaAbsY() + body2.deltaAbsY()) : -(body1.deltaAbsY() + body2.deltaAbsY());
                 body2.y += (overlap > 0) ? (body1.deltaAbsY() + body2.deltaAbsY()) : -(body1.deltaAbsY() + body2.deltaAbsY());
 
                 var nv1 = Math.sqrt((v2 * v2 * body2.mass) / body1.mass) * ((v2 > 0) ? 1 : -1);
