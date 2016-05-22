@@ -765,6 +765,9 @@
         var bounds = this.game.physics.arcade.bounds;
         var check = this.game.physics.arcade.checkCollision;
 
+        var bx = (this.worldBounce) ? -this.worldBounce.x : -this.bounce.x;
+        var by = (this.worldBounce) ? -this.worldBounce.y : -this.bounce.y;
+
         if (this.isCircle)
         {
             var bodyBounds = {};
@@ -776,26 +779,26 @@
             if (bodyBounds.x < bounds.x && check.left)
             {
                 pos.x = bounds.x - this.halfWidth + this.radius;
-                this.velocity.x *= -this.bounce.x;
+                this.velocity.x *= bx;
                 this.blocked.left = true;
             }
             else if (bodyBounds.right > bounds.right && check.right)
             {
                 pos.x = bounds.right - this.halfWidth - this.radius;
-                this.velocity.x *= -this.bounce.x;
+                this.velocity.x *= bx;
                 this.blocked.right = true;
             }
 
             if (bodyBounds.y < bounds.y && check.up)
             {
                 pos.y = bounds.y - this.halfHeight + this.radius;
-                this.velocity.y *= -this.bounce.y;
+                this.velocity.y *= by;
                 this.blocked.up = true;
             }
             else if (bodyBounds.bottom > bounds.bottom && check.down)
             {
                 pos.y = bounds.bottom  - this.halfHeight - this.radius;
-                this.velocity.y *= -this.bounce.y;
+                this.velocity.y *= by;
                 this.blocked.down = true;
             }
         }
@@ -804,26 +807,26 @@
             if (pos.x < bounds.x && check.left)
             {
                 pos.x = bounds.x;
-                this.velocity.x *= -this.bounce.x;
+                this.velocity.x *= bx;
                 this.blocked.left = true;
             }
             else if (this.right > bounds.right && check.right)
             {
                 pos.x = bounds.right - this.width;
-                this.velocity.x *= -this.bounce.x;
+                this.velocity.x *= bx;
                 this.blocked.right = true;
             }
 
             if (pos.y < bounds.y && check.up)
             {
                 pos.y = bounds.y;
-                this.velocity.y *= -this.bounce.y;
+                this.velocity.y *= by;
                 this.blocked.up = true;
             }
             else if (this.bottom > bounds.bottom && check.down)
             {
                 pos.y = bounds.bottom - this.height;
-                this.velocity.y *= -this.bounce.y;
+                this.velocity.y *= by;
                 this.blocked.down = true;
             }
         }
