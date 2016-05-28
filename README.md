@@ -37,12 +37,6 @@ Calculation of the collision produced as usual. No further use is not necessary 
 * Remember, this is an arcade physics. Not real physics. Therefore, some collisions may seem strange.
 * Remember, that the _setCircle_ function overrides scaling and anchor point.
 
-### The problem of different masses
-
-Sometimes in a collision bodies of different mass occurs sticking effect. In fact, one body pushes another endlessly.
-Unfortunately, this problem is related with the peculiarities of calculation and on the right it is not possible.
-Using the "body.bounce > 1" reduces the chance of the problem.
-
 ### License
 
 Phaser Arcade Circles plugin is released under the [MIT License](http://opensource.org/licenses/MIT).

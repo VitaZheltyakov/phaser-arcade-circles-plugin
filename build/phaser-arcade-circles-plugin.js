@@ -216,6 +216,98 @@
     };
 
     /**
+    * The core separation function to separate two physics bodies.
+    *
+    * @private
+    * @method Phaser.Physics.Arcade#separate
+    * @param {Phaser.Physics.Arcade.Body} body1 - The first Body object to separate.
+    * @param {Phaser.Physics.Arcade.Body} body2 - The second Body object to separate.
+    * @param {function} [processCallback=null] - A callback function that lets you perform additional checks against the two objects if they overlap. If this function is set then the sprites will only be collided if it returns true.
+    * @param {object} [callbackContext] - The context in which to run the process callback.
+    * @param {boolean} overlapOnly - Just run an overlap or a full collision.
+    * @return {boolean} Returns true if the bodies collided, otherwise false.
+    */
+    Phaser.Physics.Arcade.prototype.separate = function (body1, body2, processCallback, callbackContext, overlapOnly) {
+
+        if (!body1.enable || !body2.enable || !this.intersects(body1, body2))
+        {
+            return false;
+        }
+
+        //  They overlap. Is there a custom process callback? If it returns true then we can carry on, otherwise we should abort.
+        if (processCallback && processCallback.call(callbackContext, body1.sprite, body2.sprite) === false)
+        {
+            return false;
+        }
+
+        // We define the behavior of bodies in a collision circle and rectangle
+        // If a collision occurs in the corner points of the rectangle, the body behave like circles
+        var collisionAsCircle = false;
+        if (body1.isCircle !== body2.isCircle)
+        {
+            var rect = {};
+            rect.x = (body2.isCircle) ? body1.position.x : body2.position.x;
+            rect.y = (body2.isCircle) ? body1.position.y : body2.position.y;
+            rect.right = (body2.isCircle) ? body1.right : body2.right;
+            rect.bottom = (body2.isCircle) ? body1.bottom : body2.bottom;
+            var circle = {};
+            circle.x = (body1.isCircle) ? (body1.position.x + body1.radius) : (body2.position.x + body2.radius);
+            circle.y = (body1.isCircle) ? (body1.position.y + body1.radius) : (body2.position.y + body2.radius);
+
+            if (circle.y < rect.y)
+            {
+                if (circle.x < rect.x)
+                     collisionAsCircle = true;
+
+                if (circle.x > rect.right)
+                     collisionAsCircle = true;
+            }
+            if (circle.y > rect.bottom)
+            {
+                if (circle.x < rect.x)
+                    collisionAsCircle = true;
+
+                if (circle.x > rect.right)
+                    collisionAsCircle = true;
+            }
+        }
+
+        //  Circle vs. Circle quick bail out
+        if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
+        {
+            return this.separateCircle(body1, body2, overlapOnly);
+        }
+
+        var resultX = false;
+        var resultY = false;
+
+        //  Do we separate on x or y first?
+        if (this.forceX || Math.abs(this.gravity.y + body1.gravity.y) < Math.abs(this.gravity.x + body1.gravity.x))
+        {
+            resultX = this.separateX(body1, body2, overlapOnly);
+
+            //  Are they still intersecting? Let's do the other axis then
+            if (this.intersects(body1, body2))
+            {
+                resultY = this.separateY(body1, body2, overlapOnly);
+            }
+        }
+        else
+        {
+            resultY = this.separateY(body1, body2, overlapOnly);
+
+            //  Are they still intersecting? Let's do the other axis then
+            if (this.intersects(body1, body2))
+            {
+                resultX = this.separateX(body1, body2, overlapOnly);
+            }
+        }
+
+        return (resultX || resultY);
+
+    };
+
+    /**
     * Check for intersection against two bodies.
     *
     * @method Phaser.Physics.Arcade#intersects
@@ -224,36 +316,96 @@
     * @return {boolean} True if they intersect, otherwise false.
     */
     Phaser.Physics.Arcade.prototype.intersects = function (body1, body2) {
-        // Circle vs. Circle
-        if ((body1.isCircle)&&(body2.isCircle))
+
+        if (body1.isCircle)
         {
-          return (this.distanceBetweenCenters(body1, body2) <= (body1.radius + body2.radius));
+            if (body2.isCircle)
+            {
+                //  Circle vs. Circle
+                return Phaser.Math.distance(body1.center.x, body1.center.y, body2.center.x, body2.center.y) <= (body1.radius + body2.radius);
+            }
+            else
+            {
+                //  Circle vs. Rect
+                return this.circleBodyIntersects(body1, body2);
+            }
         }
-        //  Rect vs. Rect
-        else if ((!body1.isCircle)&&(!body2.isCircle))
+        else
         {
-           if (body1.right <= body2.position.x)
-           {
-               return false;
-           }
+            if (body2.isCircle)
+            {
+                //  Rect vs. Circle
+                return this.circleBodyIntersects(body2, body1);
+            }
+            else
+            {
+                //  Rect vs. Rect
+                if (body1.right <= body2.position.x)
+                {
+                    return false;
+                }
 
-           if (body1.bottom <= body2.position.y)
-           {
-               return false;
-           }
+                if (body1.bottom <= body2.position.y)
+                {
+                    return false;
+                }
 
-           if (body1.position.x >= body2.right)
-           {
-               return false;
-           }
+                if (body1.position.x >= body2.right)
+                {
+                    return false;
+                }
 
-           if (body1.position.y >= body2.bottom)
-           {
-               return false;
-           }
+                if (body1.position.y >= body2.bottom)
+                {
+                    return false;
+                }
+
+                return true;
+            }
         }
-        //  Rect vs. Circle
-        else if (body1.isCircle !== body2.isCircle)
+
+    };
+
+    /**
+    * Checks to see if a circular Body intersects with a Rectangular Body.
+    *
+    * @method Phaser.Physics.Arcade#circleBodyIntersects
+    * @param {Phaser.Physics.Arcade.Body} circle - The Body with `isCircle` set.
+    * @param {Phaser.Physics.Arcade.Body} body - The Body with `isCircle` not set (i.e. uses Rectangle shape)
+    * @return {boolean} Returns true if the bodies intersect, otherwise false.
+    */
+    Phaser.Physics.Arcade.prototype.circleBodyIntersects = function (circle, body) {
+
+        var x = Phaser.Math.clamp(circle.center.x, body.left, body.right);
+        var y = Phaser.Math.clamp(circle.center.y, body.top, body.bottom);
+
+        var dx = (circle.center.x - x) * (circle.center.x - x);
+        var dy = (circle.center.y - y) * (circle.center.y - y);
+
+        return (dx + dy) <= (circle.radius * circle.radius);
+
+    };
+
+    /**
+    * The core separation function to separate two circular physics bodies.
+    *
+    * @method Phaser.Physics.Arcade#separateCircle
+    * @private
+    * @param {Phaser.Physics.Arcade.Body} body1 - The first Body to separate. Must have `Body.isCircle` true and a positive `radius`.
+    * @param {Phaser.Physics.Arcade.Body} body2 - The second Body to separate. Must have `Body.isCircle` true and a positive `radius`.
+    * @param {boolean} overlapOnly - If true the bodies will only have their overlap data set, no separation or exchange of velocity will take place.
+    * @return {boolean} Returns true if the bodies were separated or overlap, otherwise false.
+    */
+    Phaser.Physics.Arcade.prototype.separateCircle = function (body1, body2, overlapOnly) {
+
+        //  Set the bounding box overlap values
+        this.getOverlapX(body1, body2);
+        this.getOverlapY(body1, body2);
+
+        var angleCollision = this.angleBetweenCenters(body1, body2);
+
+        var overlap = 0;
+        if (body1.isCircle !== body2.isCircle)
         {
             var rect = {};
             rect.x = (body2.isCircle) ? body1.position.x : body2.position.x;
@@ -268,176 +420,21 @@
             if ( circle.y < rect.y)
             {
                 if (circle.x < rect.x)
-                     return ((circle.x - rect.x) * (circle.x - rect.x) + (circle.y - rect.y) * (circle.y - rect.y)) <= circle.radius * circle.radius;
+                     overlap = Phaser.Math.distance(circle.x, circle.y, rect.x, rect.y) - circle.radius;
 
                 if (circle.x > rect.right)
-                     return ((circle.x - rect.right)*(circle.x - rect.right) + (circle.y - rect.y)*(circle.y - rect.y)) <= circle.radius * circle.radius;
-
-                return (rect.y - circle.y) <= circle.radius;
+                     overlap = Phaser.Math.distance(circle.x, circle.y, rect.right, rect.y) - circle.radius;
             }
             if (circle.y > rect.bottom)
             {
                 if (circle.x < rect.x)
-                    return ((circle.x - rect.x)*(circle.x - rect.x) + (circle.y - rect.bottom)*(circle.y - rect.bottom)) <= circle.radius * circle.radius;
+                    overlap = Phaser.Math.distance(circle.x, circle.y, rect.x, rect.bottom) - circle.radius;
                 if (circle.x > rect.right)
-                    return ((circle.x - rect.right)*(circle.x - rect.right) + (circle.y - rect.bottom)*(circle.y - rect.bottom)) <= circle.radius * circle.radius;
-                return (circle.y - rect.bottom) <= circle.radius;
+                    overlap = Phaser.Math.distance(circle.x, circle.y, rect.right, rect.bottom) - circle.radius;
             }
-
-            if (circle.x < rect.x)
-                return (rect.x - circle.x) <= circle.radius;
-            if (circle.x > rect.right)
-                return (circle.x - rect.right) <= circle.radius;
-
-            return ( (circle.x - rect.x) <= circle.radius || (rect.right - circle.x) <= circle.radius || (circle.y - rect.y) <= circle.radius || (rect.bottom - circle.y) <= circle.radius);
+            overlap *= -1;
         }
-
-        return true;
-
-    };
-
-    /**
-    * Calculates the horizontal overlap between two Bodies and sets their properties accordingly, including:
-    * `touching.left`, `touching.right` and `overlapX`.
-    *
-    * @method Phaser.Physics.Arcade#getOverlapX
-    * @param {Phaser.Physics.Arcade.Body} body1 - The first Body to separate.
-    * @param {Phaser.Physics.Arcade.Body} body2 - The second Body to separate.
-    * @return {float} Returns the amount of horizontal overlap between the two bodies.
-    */
-    Phaser.Physics.Arcade.prototype.getOverlapX = function (body1, body2) {
-
-        var overlap = 0;
-        var maxOverlap = body1.deltaAbsX() + body2.deltaAbsX() + this.OVERLAP_BIAS;
-        if (body1.isCircle) maxOverlap += body1.radius;
-        if (body2.isCircle) maxOverlap += body2.radius;
-
-        if (body1.deltaX() === 0 && body2.deltaX() === 0)
-        {
-            //  They overlap but neither of them are moving
-            body1.embedded = true;
-            body2.embedded = true;
-        }
-        else if (body1.deltaX() > body2.deltaX())
-        {
-            //  Body1 is moving right and / or Body2 is moving left
-            overlap = body1.right - body2.x;
-
-            if ((overlap > maxOverlap) || body1.checkCollision.right === false || body2.checkCollision.left === false)
-            {
-                overlap = 0;
-            }
-            else
-            {
-                body1.touching.none = false;
-                body1.touching.right = true;
-                body2.touching.none = false;
-                body2.touching.left = true;
-            }
-        }
-        else if (body1.deltaX() < body2.deltaX())
-        {
-            //  Body1 is moving left and/or Body2 is moving right
-            overlap = body1.x - body2.width - body2.x;
-
-            if ((-overlap > maxOverlap) || body1.checkCollision.left === false || body2.checkCollision.right === false)
-            {
-                overlap = 0;
-            }
-            else
-            {
-                body1.touching.none = false;
-                body1.touching.left = true;
-                body2.touching.none = false;
-                body2.touching.right = true;
-            }
-        }
-
-        //  Resets the overlapX to zero if there is no overlap, or to the actual pixel value if there is
-        body1.overlapX = overlap;
-        body2.overlapX = overlap;
-
-        return overlap;
-
-    };
-
-    /**
-    * Calculates the vertical overlap between two Bodies and sets their properties accordingly, including:
-    * `touching.up`, `touching.down` and `overlapY`.
-    *
-    * @method Phaser.Physics.Arcade#getOverlapY
-    * @param {Phaser.Physics.Arcade.Body} body1 - The first Body to separate.
-    * @param {Phaser.Physics.Arcade.Body} body2 - The second Body to separate.
-    * @return {float} Returns the amount of vertical overlap between the two bodies.
-    */
-    Phaser.Physics.Arcade.prototype.getOverlapY = function (body1, body2) {
-
-        var overlap = 0;
-        var maxOverlap = body1.deltaAbsY() + body2.deltaAbsY() + this.OVERLAP_BIAS;
-        if (body1.isCircle) maxOverlap += body1.radius;
-        if (body2.isCircle) maxOverlap += body2.radius;
-
-        if (body1.deltaY() === 0 && body2.deltaY() === 0)
-        {
-            //  They overlap but neither of them are moving
-            body1.embedded = true;
-            body2.embedded = true;
-        }
-        else if (body1.deltaY() > body2.deltaY())
-        {
-            //  Body1 is moving down and/or Body2 is moving up
-            overlap = body1.bottom - body2.y;
-
-            if ((overlap > maxOverlap) || body1.checkCollision.down === false || body2.checkCollision.up === false)
-            {
-                overlap = 0;
-            }
-            else
-            {
-                body1.touching.none = false;
-                body1.touching.down = true;
-                body2.touching.none = false;
-                body2.touching.up = true;
-            }
-        }
-        else if (body1.deltaY() < body2.deltaY())
-        {
-            //  Body1 is moving up and/or Body2 is moving down
-            overlap = body1.y - body2.bottom;
-            if ((-overlap > maxOverlap) || body1.checkCollision.up === false || body2.checkCollision.down === false)
-            {
-                overlap = 0;
-            }
-            else
-            {
-                body1.touching.none = false;
-                body1.touching.up = true;
-                body2.touching.none = false;
-                body2.touching.down = true;
-            }
-        }
-
-        //  Resets the overlapY to zero if there is no overlap, or to the actual pixel value if there is
-        body1.overlapY = overlap;
-        body2.overlapY = overlap;
-
-        return overlap;
-
-    };
-
-    /**
-    * The core separation function to separate two physics bodies on the x axis.
-    *
-    * @method Phaser.Physics.Arcade#separateX
-    * @private
-    * @param {Phaser.Physics.Arcade.Body} body1 - The first Body to separate.
-    * @param {Phaser.Physics.Arcade.Body} body2 - The second Body to separate.
-    * @param {boolean} overlapOnly - If true the bodies will only have their overlap data set, no separation or exchange of velocity will take place.
-    * @return {boolean} Returns true if the bodies were separated or overlap, otherwise false.
-    */
-    Phaser.Physics.Arcade.prototype.separateX = function (body1, body2, overlapOnly) {
-
-        var overlap = this.getOverlapX(body1, body2);
+        else overlap = (body1.radius + body2.radius) - Phaser.Math.distance(body1.center.x, body1.center.y, body2.center.x, body2.center.y);
 
         //  Can't separate two immovable bodies, or a body with its own custom separation logic
         if (overlapOnly || overlap === 0 || (body1.immovable && body2.immovable) || body1.customSeparateX || body2.customSeparateX)
@@ -446,275 +443,74 @@
             return (overlap !== 0);
         }
 
-        // We define the behavior of bodies in a collision circle and rectangle
-        // If a collision occurs in the corner points of the rectangle, the body behave like circles
-        if (body1.isCircle !== body2.isCircle)
+        // Transform the velocity vector to the coordinate system oriented along the direction of impact. This is done to eliminate the vertical component of the velocity
+        var v1 = {
+            x : body1.velocity.x * Math.cos(angleCollision) + body1.velocity.y * Math.sin(angleCollision),
+            y : body1.velocity.x * Math.sin(angleCollision) - body1.velocity.y * Math.cos(angleCollision)
+        }
+        var v2 = {
+            x : body2.velocity.x * Math.cos(angleCollision) + body2.velocity.y * Math.sin(angleCollision),
+            y : body2.velocity.x * Math.sin(angleCollision) - body2.velocity.y * Math.cos(angleCollision)
+        }
+
+        // We expect the new velocity after impact
+        var tempVel1 = ((body1.mass - body2.mass) * v1.x + 2 * body2.mass * v2.x) / (body1.mass + body2.mass);
+        var tempVel2 = (2 * body1.mass * v1.x + (body2.mass - body1.mass) * v2.x) / (body1.mass + body2.mass);
+
+        // We convert the vector to the original coordinate system and multiplied by factor of rebound
+        if (!body1.immovable)
         {
-            var collisionAsCircle = false;
+            body1.velocity.x = (tempVel1 * Math.cos(angleCollision) - v1.y * Math.sin(angleCollision)) * body1.bounce.x;
+            body1.velocity.y = (v1.y * Math.cos(angleCollision) + tempVel1 * Math.sin(angleCollision)) * body1.bounce.y;
+        }
+        if (!body2.immovable)
+        {
+            body2.velocity.x = (tempVel2 * Math.cos(angleCollision) - v2.y * Math.sin(angleCollision)) * body2.bounce.x;
+            body2.velocity.y = (v2.y * Math.cos(angleCollision) + tempVel2 * Math.sin(angleCollision)) * body2.bounce.y;
+        }
 
-            var rect = {};
-            rect.x = (body2.isCircle) ? body1.position.x : body2.position.x;
-            rect.y = (body2.isCircle) ? body1.position.y : body2.position.y;
-            rect.right = (body2.isCircle) ? body1.right : body2.right;
-            rect.bottom = (body2.isCircle) ? body1.bottom : body2.bottom;
-            var circle = {};
-            circle.x = (body1.isCircle) ? (body1.position.x + body1.radius) : (body2.position.x + body2.radius);
-            circle.y = (body1.isCircle) ? (body1.position.y + body1.radius) : (body2.position.y + body2.radius);
-
-            if (circle.y < rect.y)
+        // When the collision angle almost perpendicular to the total initial velocity vector (collision on a tangent) vector direction can be determined incorrectly.
+        // This code fixes the problem
+        if (angleCollision > 0)
+        {
+            if (Math.abs(angleCollision) < Math.PI/2)
             {
-                if (circle.x < rect.x)
-                     collisionAsCircle = true;
-
-                if (circle.x > rect.right)
-                     collisionAsCircle = true;
+                if ((body1.velocity.x > 0)&&(!body1.immovable)) body1.velocity.x *= -1;
+                else if ((body2.velocity.x < 0)&&(!body2.immovable)) body2.velocity.x *= -1;
+                else if ((body1.velocity.y > 0)&&(!body1.immovable)) body1.velocity.y *= -1;
+                else if ((body2.velocity.y < 0)&&(!body2.immovable)) body2.velocity.y *= -1;
             }
-            if (circle.y > rect.bottom)
+            else if (Math.abs(angleCollision) > Math.PI/2)
             {
-                if (circle.x < rect.x)
-                    collisionAsCircle = true;
-
-                if (circle.x > rect.right)
-                    collisionAsCircle = true;
+                if ((body1.velocity.x < 0)&&(!body1.immovable)) body1.velocity.x *= -1;
+                else if ((body2.velocity.x > 0)&&(!body2.immovable)) body2.velocity.x *= -1;
+                else if ((body1.velocity.y < 0)&&(!body1.immovable)) body1.velocity.y *= -1;
+                else if ((body2.velocity.y > 0)&&(!body2.immovable)) body2.velocity.y *= -1;
+            }
+        }
+        if (angleCollision < 0)
+        {
+            if (Math.abs(angleCollision) < Math.PI/2)
+            {
+                if ((body1.velocity.x > 0)&&(!body1.immovable)) body1.velocity.x *= -1;
+                else if ((body2.velocity.x < 0)&&(!body2.immovable)) body2.velocity.x *= -1;
+                else if ((body1.velocity.y > 0)&&(!body1.immovable)) body1.velocity.y *= -1;
+                else if ((body2.velocity.y < 0)&&(!body2.immovable)) body2.velocity.y *= -1;
+            }
+            else if (Math.abs(angleCollision) > Math.PI/2)
+            {
+                if ((body1.velocity.x < 0)&&(!body1.immovable)) body1.velocity.x *= -1;
+                else if ((body2.velocity.x > 0)&&(!body2.immovable)) body2.velocity.x *= -1;
+                else if ((body1.velocity.y < 0)&&(!body1.immovable)) body1.velocity.y *= -1;
+                else if ((body2.velocity.y > 0)&&(!body2.immovable)) body2.velocity.y *= -1;
             }
         }
 
-        // To calculate the collision circle angle needed between bodies
-        if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
-        {
-            var angleCollision = this.angleBetweenCenters(body1, body2);
-        }
+        if (!body1.immovable) body1.x += (body1.velocity.x * this.game.time.physicsElapsed) - overlap*Math.cos(angleCollision);
+        if (!body2.immovable) body2.x += (body2.velocity.x * this.game.time.physicsElapsed) + overlap*Math.cos(angleCollision);
+        if (!body1.immovable) body1.y += (body1.velocity.y * this.game.time.physicsElapsed) - overlap*Math.sin(angleCollision);
+        if (!body2.immovable) body2.y += (body2.velocity.y * this.game.time.physicsElapsed) + overlap*Math.sin(angleCollision);
 
-        //  Adjust their positions and velocities accordingly (if there was any overlap)
-        var v1 = body1.velocity.x;
-        var v2 = body2.velocity.x;
-
-        if (!body1.immovable && !body2.immovable)
-        {
-            if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
-            {
-                body1.x += (overlap > 0) ? (body1.deltaAbsX() + body2.deltaAbsX()) : -(body1.deltaAbsX() + body2.deltaAbsX());
-                body2.x += (overlap > 0) ? (body1.deltaAbsX() + body2.deltaAbsX()) : -(body1.deltaAbsX() + body2.deltaAbsX());
-
-                var nv1 = Math.sqrt((v2 * v2 * body2.mass) / body1.mass) * ((v2 > 0) ? 1 : -1);
-                var nv2 = Math.sqrt((v1 * v1 * body1.mass) / body2.mass) * ((v1 > 0) ? 1 : -1);
-                var avg = (nv1 + nv2) * 0.5;
-
-                nv1 -= avg;
-                nv2 -= avg;
-
-                body1.velocity.x = (avg + nv1 * body1.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
-                body1.velocity.y += -(avg + nv1 * body1.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
-                body2.velocity.x = (avg + nv2 * body2.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
-                body2.velocity.y += (avg + nv2 * body2.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
-            }
-            else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
-            {
-                overlap *= 0.5;
-
-                body1.x -= overlap;
-                body2.x += overlap;
-
-                var nv1 = Math.sqrt((v2 * v2 * body2.mass) / body1.mass) * ((v2 > 0) ? 1 : -1);
-                var nv2 = Math.sqrt((v1 * v1 * body1.mass) / body2.mass) * ((v1 > 0) ? 1 : -1);
-                var avg = (nv1 + nv2) * 0.5;
-
-                nv1 -= avg;
-                nv2 -= avg;
-
-                body1.velocity.x = avg + nv1 * body1.bounce.x;
-                body2.velocity.x = avg + nv2 * body2.bounce.x;
-            }
-        }
-        else if (!body1.immovable)
-        {
-            if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
-            {
-                body1.x += (overlap > 0) ? -(body1.deltaAbsX() + body2.deltaAbsX()) : (body1.deltaAbsX() + body2.deltaAbsX());
-                body1.velocity.x = (v2 - v1 * body1.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
-                body1.velocity.y += (v2 - v1 * body1.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
-            }
-            else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
-            {
-                body1.x -= overlap;
-                body1.velocity.x = v2 - v1 * body1.bounce.x;
-
-                //  This is special case code that handles things like vertically moving platforms you can ride
-                if (body2.moves)
-                {
-                    body1.y += (body2.y - body2.prev.y) * body2.friction.y;
-                }
-            }
-        }
-        else if (!body2.immovable)
-        {
-            if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
-            {
-                body2.x += (overlap > 0) ? (body1.deltaAbsX() + body2.deltaAbsX()) : -(body1.deltaAbsX() + body2.deltaAbsX());
-                body2.velocity.x = (v1 - v2 * body2.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
-                body2.velocity.y += (v1 - v2 * body2.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
-            }
-            else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
-            {
-                body2.x += overlap;
-                body2.velocity.x = v1 - v2 * body2.bounce.x;
-
-                //  This is special case code that handles things like vertically moving platforms you can ride
-                if (body1.moves)
-                {
-                    body2.y += (body1.y - body1.prev.y) * body1.friction.y;
-                }
-            }
-        }
-
-        //  If we got this far then there WAS overlap, and separation is complete, so return true
-        return true;
-
-    };
-
-    /**
-    * The core separation function to separate two physics bodies on the y axis.
-    *
-    * @private
-    * @method Phaser.Physics.Arcade#separateY
-    * @param {Phaser.Physics.Arcade.Body} body1 - The first Body to separate.
-    * @param {Phaser.Physics.Arcade.Body} body2 - The second Body to separate.
-    * @param {boolean} overlapOnly - If true the bodies will only have their overlap data set, no separation or exchange of velocity will take place.
-    * @return {boolean} Returns true if the bodies were separated or overlap, otherwise false.
-    */
-    Phaser.Physics.Arcade.prototype.separateY = function (body1, body2, overlapOnly) {
-
-        var overlap = this.getOverlapY(body1, body2);
-
-        //  Can't separate two immovable bodies, or a body with its own custom separation logic
-        if (overlapOnly || overlap === 0 || (body1.immovable && body2.immovable) || body1.customSeparateY || body2.customSeparateY)
-        {
-            //  return true if there was some overlap, otherwise false
-            return (overlap !== 0);
-        }
-
-        // We define the behavior of bodies in a collision circle and rectangle
-        // If a collision occurs in the corner points of the rectangle, the body behave like circles
-        if (body1.isCircle !== body2.isCircle)
-        {
-            var collisionAsCircle = false;
-
-            var rect = {};
-            rect.x = (body2.isCircle) ? body1.position.x : body2.position.x;
-            rect.y = (body2.isCircle) ? body1.position.y : body2.position.y;
-            rect.right = (body2.isCircle) ? body1.right : body2.right;
-            rect.bottom = (body2.isCircle) ? body1.bottom : body2.bottom;
-            var circle = {};
-            circle.x = (body1.isCircle) ? (body1.position.x + body1.radius) : (body2.position.x + body2.radius);
-            circle.y = (body1.isCircle) ? (body1.position.y + body1.radius) : (body2.position.y + body2.radius);
-
-            if (circle.y < rect.y)
-            {
-                if (circle.x < rect.x)
-                     collisionAsCircle = true;
-
-                if (circle.x > rect.right)
-                     collisionAsCircle = true;
-            }
-            if (circle.y > rect.bottom)
-            {
-                if (circle.x < rect.x)
-                    collisionAsCircle = true;
-
-                if (circle.x > rect.right)
-                    collisionAsCircle = true;
-            }
-        }
-
-        // To calculate the collision circle angle needed between bodies
-        if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
-        {
-            var angleCollision = this.angleBetweenCenters(body1, body2);
-        }
-
-        //  Adjust their positions and velocities accordingly (if there was any overlap)
-        var v1 = body1.velocity.y;
-        var v2 = body2.velocity.y;
-
-        if (!body1.immovable && !body2.immovable)
-        {
-            if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
-            {
-                body1.y += (overlap > 0) ? (body1.deltaAbsY() + body2.deltaAbsY()) : -(body1.deltaAbsY() + body2.deltaAbsY());
-                body2.y += (overlap > 0) ? (body1.deltaAbsY() + body2.deltaAbsY()) : -(body1.deltaAbsY() + body2.deltaAbsY());
-
-                var nv1 = Math.sqrt((v2 * v2 * body2.mass) / body1.mass) * ((v2 > 0) ? 1 : -1);
-                var nv2 = Math.sqrt((v1 * v1 * body1.mass) / body2.mass) * ((v1 > 0) ? 1 : -1);
-                var avg = (nv1 + nv2) * 0.5;
-
-                nv1 -= avg;
-                nv2 -= avg;
-
-                body1.velocity.x += -(avg + nv1 * body1.bounce.x)*Math.sin(angleCollision)*Math.cos(angleCollision);
-                body1.velocity.y = (avg + nv1 * body1.bounce.y)*Math.sin(angleCollision)*Math.sin(angleCollision);
-                body2.velocity.x += (avg + nv2 * body2.bounce.x)*Math.sin(angleCollision)*Math.cos(angleCollision);
-                body2.velocity.y = (avg + nv2 * body2.bounce.y)*Math.sin(angleCollision)*Math.sin(angleCollision);
-            }
-            else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
-            {
-                overlap *= 0.5;
-
-                body1.y -= overlap;
-                body2.y += overlap;
-
-                var nv1 = Math.sqrt((v2 * v2 * body2.mass) / body1.mass) * ((v2 > 0) ? 1 : -1);
-                var nv2 = Math.sqrt((v1 * v1 * body1.mass) / body2.mass) * ((v1 > 0) ? 1 : -1);
-                var avg = (nv1 + nv2) * 0.5;
-
-                nv1 -= avg;
-                nv2 -= avg;
-
-                body1.velocity.y = avg + nv1 * body1.bounce.y;
-                body2.velocity.y = avg + nv2 * body2.bounce.y;
-            }
-        }
-        else if (!body1.immovable)
-        {
-            if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
-            {
-                body1.y += (overlap > 0) ? -(body1.deltaAbsY() + body2.deltaAbsY()) : (body1.deltaAbsY() + body2.deltaAbsY());
-                body1.velocity.x += (v2 - v1 * body1.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
-                body1.velocity.y = (v2 - v1 * body1.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
-            }
-            else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
-            {
-                body1.y -= overlap;
-                body1.velocity.y = v2 - v1 * body1.bounce.y;
-
-                //  This is special case code that handles things like horizontal moving platforms you can ride
-                if (body2.moves)
-                {
-                    body1.x += (body2.x - body2.prev.x) * body2.friction.x;
-                }
-            }
-        }
-        else
-        {
-            if ( ((body1.isCircle)&&(body2.isCircle)) || collisionAsCircle )
-            {
-                body2.y += (overlap > 0) ? (body1.deltaAbsY() + body2.deltaAbsY()) : -(body1.deltaAbsY() + body2.deltaAbsY());
-                body2.velocity.x += (v1 - v2 * body2.bounce.x)*Math.cos(angleCollision)*Math.cos(angleCollision);
-                body2.velocity.y = (v1 - v2 * body2.bounce.y)*Math.cos(angleCollision)*Math.sin(angleCollision);
-            }
-            else if ( ((!body1.isCircle)&&(!body2.isCircle)) || !collisionAsCircle )
-            {
-                body2.y += overlap;
-                body2.velocity.y = v1 - v2 * body2.bounce.y;
-
-                //  This is special case code that handles things like horizontal moving platforms you can ride
-                if (body1.moves)
-                {
-                    body2.x += (body1.x - body1.prev.x) * body1.friction.x;
-                }
-            }
-        }
-
-        //  If we got this far then there WAS overlap, and separation is complete, so return true
         return true;
 
     };
@@ -831,7 +627,6 @@
             }
         }
     };
-
 
     /**
     * Render Sprite Body.
