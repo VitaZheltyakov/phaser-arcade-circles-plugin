@@ -10,7 +10,7 @@ This plugin adds to framework:
 * function angleBetweenCenters()
 
 The plugin does not reduce the performance of arcade physics.
-The plugin is easy to use. There is no need to use the new functions.
+The plugin is easy to use. 
 
 ### How to add a plugin
 
@@ -21,7 +21,7 @@ Add to your index.html link to plugin file:
 
 ### How to use a plugin
 
-Then use the standard function **setCircle** for the circle-body.
+Then use the function **setCircle** for the circle-body.
 ```
 sprite1.body.setCircle(radius, offsetX, offsetY);
 ```

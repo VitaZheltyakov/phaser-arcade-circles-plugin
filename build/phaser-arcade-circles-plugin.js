@@ -471,39 +471,19 @@
 
         // When the collision angle almost perpendicular to the total initial velocity vector (collision on a tangent) vector direction can be determined incorrectly.
         // This code fixes the problem
-        if (angleCollision > 0)
+        if (Math.abs(angleCollision) < Math.PI/2)
         {
-            if (Math.abs(angleCollision) < Math.PI/2)
-            {
-                if ((body1.velocity.x > 0)&&(!body1.immovable)) body1.velocity.x *= -1;
-                else if ((body2.velocity.x < 0)&&(!body2.immovable)) body2.velocity.x *= -1;
-                else if ((body1.velocity.y > 0)&&(!body1.immovable)) body1.velocity.y *= -1;
-                else if ((body2.velocity.y < 0)&&(!body2.immovable)) body2.velocity.y *= -1;
-            }
-            else if (Math.abs(angleCollision) > Math.PI/2)
-            {
-                if ((body1.velocity.x < 0)&&(!body1.immovable)) body1.velocity.x *= -1;
-                else if ((body2.velocity.x > 0)&&(!body2.immovable)) body2.velocity.x *= -1;
-                else if ((body1.velocity.y < 0)&&(!body1.immovable)) body1.velocity.y *= -1;
-                else if ((body2.velocity.y > 0)&&(!body2.immovable)) body2.velocity.y *= -1;
-            }
+            if ((body1.velocity.x > 0)&&(!body1.immovable)&&(body2.velocity.x > body1.velocity.x)) body1.velocity.x *= -1;
+            else if ((body2.velocity.x < 0)&&(!body2.immovable)&&(body1.velocity.x < body2.velocity.x)) body2.velocity.x *= -1;
+            else if ((body1.velocity.y > 0)&&(!body1.immovable)&&(body2.velocity.y > body1.velocity.y)) body1.velocity.y *= -1;
+            else if ((body2.velocity.y < 0)&&(!body2.immovable)&&(body1.velocity.y < body2.velocity.y)) body2.velocity.y *= -1;
         }
-        if (angleCollision < 0)
+        else if (Math.abs(angleCollision) > Math.PI/2)
         {
-            if (Math.abs(angleCollision) < Math.PI/2)
-            {
-                if ((body1.velocity.x > 0)&&(!body1.immovable)) body1.velocity.x *= -1;
-                else if ((body2.velocity.x < 0)&&(!body2.immovable)) body2.velocity.x *= -1;
-                else if ((body1.velocity.y > 0)&&(!body1.immovable)) body1.velocity.y *= -1;
-                else if ((body2.velocity.y < 0)&&(!body2.immovable)) body2.velocity.y *= -1;
-            }
-            else if (Math.abs(angleCollision) > Math.PI/2)
-            {
-                if ((body1.velocity.x < 0)&&(!body1.immovable)) body1.velocity.x *= -1;
-                else if ((body2.velocity.x > 0)&&(!body2.immovable)) body2.velocity.x *= -1;
-                else if ((body1.velocity.y < 0)&&(!body1.immovable)) body1.velocity.y *= -1;
-                else if ((body2.velocity.y > 0)&&(!body2.immovable)) body2.velocity.y *= -1;
-            }
+            if ((body1.velocity.x < 0)&&(!body1.immovable)&&(body2.velocity.x < body1.velocity.x)) body1.velocity.x *= -1;
+            else if ((body2.velocity.x > 0)&&(!body2.immovable)&&(body1.velocity.x > body2.velocity.x)) body2.velocity.x *= -1;
+            else if ((body1.velocity.y < 0)&&(!body1.immovable)&&(body2.velocity.y < body1.velocity.y)) body1.velocity.y *= -1;
+            else if ((body2.velocity.y > 0)&&(!body2.immovable)&&(body1.velocity.x > body2.velocity.y)) body2.velocity.y *= -1;
         }
 
         if (!body1.immovable) body1.x += (body1.velocity.x * this.game.time.physicsElapsed) - overlap*Math.cos(angleCollision);
@@ -546,6 +526,66 @@
         var dy = target.center.y - source.center.y;
 
         return Math.atan2(dy, dx);
+
+    };
+
+    /**
+    * If `true` this Body is using circular collision detection. If `false` it is using rectangular.
+    * Use `Body.setCircle` to control the collision shape this Body uses.
+    * @property {boolean} isCircle
+    * @default
+    * @readOnly
+    */
+    Phaser.Physics.Arcade.Body.prototype.isCircle = false;
+
+    /**
+    * The radius of the circular collision shape this Body is using if Body.setCircle has been enabled.
+    * If you wish to change the radius then call `setCircle` again with the new value.
+    * If you wish to stop the Body using a circle then call `setCircle` with a radius of zero (or undefined).
+    * @property {float} radius
+    * @default
+    * @readOnly
+    */
+    Phaser.Physics.Arcade.Body.prototype.radius = 0;
+
+    /**
+    * Sets this Body as using a circle, of the given radius, for all collision detection instead of a rectangle.
+    * The radius is given in pixels and is the distance from the center of the circle to the edge.
+    *
+    * You can also control the x and y offset, which is the position of the Body relative to the top-left of the Sprite.
+    *
+    * @method Phaser.Physics.Arcade.Body#setCircle
+    * @param {number} [radius] - The radius of the Body in pixels. Pass a value of zero / undefined, to stop the Body using a circle for collision.
+    * @param {number} [offsetX] - The X offset of the Body from the Sprite position.
+    * @param {number} [offsetY] - The Y offset of the Body from the Sprite position.
+    */
+    Phaser.Physics.Arcade.Body.prototype.setCircle = function (radius, offsetX, offsetY) {
+
+        if (offsetX === undefined) { offsetX = this.offset.x; }
+        if (offsetY === undefined) { offsetY = this.offset.y; }
+
+        if (radius > 0)
+        {
+            this.isCircle = true;
+            this.radius = radius;
+
+            this.sourceWidth = radius * 2;
+            this.sourceHeight = radius * 2;
+
+            this.width = this.sourceWidth * this._sx;
+            this.height = this.sourceHeight * this._sy;
+
+            this.halfWidth = Math.floor(this.width / 2);
+            this.halfHeight = Math.floor(this.height / 2);
+
+            this.offset.setTo(offsetX, offsetY);
+
+            this.center.setTo(this.position.x + this.halfWidth, this.position.y + this.halfHeight);
+        }
+        else
+        {
+            this.isCircle = false;
+        }
 
     };
 
