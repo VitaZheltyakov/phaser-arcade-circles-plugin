@@ -1,6 +1,8 @@
 # Phaser Arcade Circles plugin
 Created by [Vitaliy Zheltyakov](mailto:vita-zhelt@yandex.ru).
 
+## The plugin is not relevant since Phaser 2.6
+
 Phaser is a fast, free and fun open source HTML5 game framework.
 This plugin adds to framework:
 * Circle vs. Circle collision
@@ -10,7 +12,7 @@ This plugin adds to framework:
 * function angleBetweenCenters()
 
 The plugin does not reduce the performance of arcade physics.
-The plugin is easy to use. 
+The plugin is easy to use.
 
 ### How to add a plugin
 
